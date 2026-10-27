@@ -1,0 +1,68 @@
+name: Build ESP32 WOL
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "esp32-dangbei-wol/**"
+      - ".github/workflows/build-esp32-wol.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build esp32-dangbei-wol (ESP32-C3)
+    runs-on: ubuntu-latest
+    container: espressif/idf:v5.5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build firmware
+        shell: bash
+        run: |
+          . $IDF_PATH/export.sh
+          cd esp32-dangbei-wol
+          idf.py set-target esp32c3
+          idf.py build
+          echo "=== flash files ==="
+          ls -la build/bootloader/bootloader.bin build/partition_table/partition-table.bin build/dangbei_wol.bin
+          mkdir -p dist
+          cp build/bootloader/bootloader.bin dist/
+          cp build/partition_table/partition-table.bin dist/
+          cp build/dangbei_wol.bin dist/
+          cp build/flasher_args.json dist/ || true
+          cp build/flash_args dist/ || true
+          cp build/dangbei_wol.elf dist/ || true
+          cat > dist/FLASHING.md << 'EOF'
+          # dangbei_wol ESP32-C3 flash guide
+
+          ## Flash Download Tool
+          - Chip: ESP32-C3
+          - SPI MODE: DIO
+          - SPI SPEED: 80 MHz
+          - FLASH SIZE: 4MB
+
+          | File | Address |
+          |------|---------|
+          | bootloader.bin | 0x0 |
+          | partition-table.bin | 0x8000 |
+          | dangbei_wol.bin | 0x10000 |
+
+          ## esptool
+          ```
+          esptool.py --chip esp32c3 -b 460800 write_flash \
+            0x0 bootloader.bin \
+            0x8000 partition-table.bin \
+            0x10000 dangbei_wol.bin
+          ```
+          EOF
+
+      - name: Upload firmware artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dangbei-wol-esp32c3
+          path: esp32-dangbei-wol/dist/
+          if-no-files-found: error
+          retention-days: 30
