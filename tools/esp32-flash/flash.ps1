@@ -14,7 +14,27 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$Dist = Join-Path $PSScriptRoot 'dist'
+# Support both layouts:
+#   repo/tools/esp32-flash + repo/dist
+#   release zip with bins next to flash.ps1
+$DistCandidates = @(
+    (Join-Path $PSScriptRoot 'dist'),
+    (Join-Path $PSScriptRoot 'firmware'),
+    $PSScriptRoot,
+    (Join-Path (Split-Path $PSScriptRoot -Parent) 'dist'),
+    (Join-Path (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) 'dist')
+)
+$Dist = $null
+foreach ($cand in $DistCandidates) {
+    if ((Test-Path (Join-Path $cand 'bootloader.bin')) -and
+        (Test-Path (Join-Path $cand 'dangbei_wol.bin'))) {
+        $Dist = $cand
+        break
+    }
+}
+if (-not $Dist) {
+    $Dist = Join-Path $PSScriptRoot 'dist'
+}
 $Bootloader = Join-Path $Dist 'bootloader.bin'
 $PartTable  = Join-Path $Dist 'partition-table.bin'
 $App        = Join-Path $Dist 'dangbei_wol.bin'
